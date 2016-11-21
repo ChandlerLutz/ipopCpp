@@ -1,6 +1,6 @@
 Rcpp implementation of the `kernlab::ipop()` function
 
-# Instillation:
+### Instillation:
 
     library(devtools)
     install_github("ChandlerLutz/ipopCpp")
