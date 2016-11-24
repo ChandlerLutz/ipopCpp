@@ -8,6 +8,8 @@ Maintainer: Chandler Lutz <cl.eco@cbs.dk>
 Description: Rcpp implementation of Quadratic Problem Solver based on the
     kernlab::ipop() function.
 License: GPL-2
+Depends:
+    R (>= 3.1.0)
 Imports:
     Rcpp (>= 0.12.8)
 LinkingTo: Rcpp, RcppArmadillo

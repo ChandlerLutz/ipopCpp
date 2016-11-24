@@ -11,6 +11,10 @@ library(RcppArmadillo);
 library(kernlab);
 library(microbenchmark)
 
+##source("R/ipop_kernlab.R")
+
+set.seed(1234)
+
 ## -- Small tests for comparing Cpp to r output -- ##
 
 ## solve the Support Vector Machine optimization problem
@@ -37,10 +41,167 @@ r <- matrix(0)
 test_that("kernlab::ipop and ipopCpp are equal", {
     expect_equal(ipop(c,H,A,b,l,u,r)@primal, as.numeric(ipopCpp(c,H,A,b,l,u,r)$primal))
     expect_equal(ipop(c,H,A,b,l,u,r)@dual, as.numeric(ipopCpp(c,H,A,b,l,u,r)$dual))
-    })
+})
 
-## sv <- ipop(c,H,A,b,l,u,r)
-## sv2 <- ipopCpp(c,H,A,b,l,u,r)
+##########################
+##### Synth Examples #####
+##########################
+
+tol <- 1e-01
+
+##source("../scratch/ipop_kernlab.r")
+
+##Run test using synth
+data(solution_v_forc_example)
+data(X_scaled_forc_example)
+
+## -- Check for i == 9, a previous bug -- ##
+
+solution.v <- rep(1 / 12, 12)
+treated <- 9
+
+X0.scaled <- X_scaled_forc_example[, -treated]
+X1.scaled <- X_scaled_forc_example[, treated]
+##solution.v <- solution_v_forc_example
+solution.v <- rep(1 / 12, 12)
+nvarsV = length(solution.v)
+
+V <- diag(x=as.numeric(solution.v),nrow=nvarsV,ncol=nvarsV)
+H <- t(X0.scaled) %*% V %*% (X0.scaled)
+a <- X1.scaled
+c <- -1*c(t(a) %*% V %*% (X0.scaled) )
+A <- t(rep(1, length(c)))
+b <- 1
+l <- rep(0, length(c))
+u <- rep(1, length(c))
+r <- 0
+res <- ipop(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+            margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+res2 <- ipopCpp(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+test_that(paste0("kernlab and ipopCPP are equal for synth examples with equal weights for starting values for i == 9"), {
+    expect_equal(as.numeric(res@primal), as.numeric(ipopCpp(c,H,A,b,l,u,r)$primal),
+                 tolerance = tol)
+    expect_equal(res@dual, as.numeric(ipopCpp(c,H,A,b,l,u,r)$dual),
+                 tolerance = tol)
+
+})
+
+
+## -- Use equal weights for starting value -- ##
+
+solution.v <- rep(1 / 12, 12)
+
+
+
+for (i in 1:ncol(X_scaled_forc_example)) {
+    treated <- i
+
+    X0.scaled <- X_scaled_forc_example[, -treated]
+    X1.scaled <- X_scaled_forc_example[, treated]
+    ##solution.v <- solution_v_forc_example
+    solution.v <- rep(1 / 12, 12)
+    nvarsV = length(solution.v)
+
+    V <- diag(x=as.numeric(solution.v),nrow=nvarsV,ncol=nvarsV)
+    H <- t(X0.scaled) %*% V %*% (X0.scaled)
+    a <- X1.scaled
+    c <- -1*c(t(a) %*% V %*% (X0.scaled) )
+    A <- t(rep(1, length(c)))
+    b <- 1
+    l <- rep(0, length(c))
+    u <- rep(1, length(c))
+    r <- 0
+    res <- ipop(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    res@dual
+    res2 <- ipopCpp(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                    margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    test_that(paste0("kernlab and ipopCPP are equal for synth examples with equal weights for starting values for ", i), {
+        expect_equal(res@primal, as.numeric(ipopCpp(c,H,A,b,l,u,r)$primal),
+                     tolerance = tol)
+        expect_equal(res@dual, as.numeric(ipopCpp(c,H,A,b,l,u,r)$dual),
+                     tolerance = tol)
+
+    })
+}
+
+
+## -- Use the optimal solution for starting values starting value -- ##
+
+solution.v <- solution_v_forc_example
+
+for (i in 1:ncol(X_scaled_forc_example)) {
+    treated <- i
+
+    X0.scaled <- X_scaled_forc_example[, -treated]
+    X1.scaled <- X_scaled_forc_example[, treated]
+    ##solution.v <- solution_v_forc_example
+    solution.v <- rep(1 / 12, 12)
+    nvarsV = length(solution.v)
+
+    V <- diag(x=as.numeric(solution.v),nrow=nvarsV,ncol=nvarsV)
+    H <- t(X0.scaled) %*% V %*% (X0.scaled)
+    a <- X1.scaled
+    c <- -1*c(t(a) %*% V %*% (X0.scaled) )
+    A <- t(rep(1, length(c)))
+    b <- 1
+    l <- rep(0, length(c))
+    u <- rep(1, length(c))
+    r <- 0
+    res <- ipop(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    res@dual
+    res2 <- ipopCpp(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                    margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    test_that(paste0("kernlab and ipopCPP are equal for synth examples with the optimal solution for starting values for ", i), {
+        expect_equal(res@primal, as.numeric(ipopCpp(c,H,A,b,l,u,r)$primal),
+                     tolerance = tol)
+        expect_equal(res@dual, as.numeric(ipopCpp(c,H,A,b,l,u,r)$dual),
+                     tolerance = tol)
+    })
+}
+
+
+## -- Use random weights for starting values starting value -- ##
+
+solution.v <- runif(12)
+solution.v <- solution.v / sum(solution.v)
+
+for (i in 1:ncol(X_scaled_forc_example)) {
+    treated <- i
+
+    X0.scaled <- X_scaled_forc_example[, -treated]
+    X1.scaled <- X_scaled_forc_example[, treated]
+    ##solution.v <- solution_v_forc_example
+    solution.v <- rep(1 / 12, 12)
+    nvarsV = length(solution.v)
+
+    V <- diag(x=as.numeric(solution.v),nrow=nvarsV,ncol=nvarsV)
+    H <- t(X0.scaled) %*% V %*% (X0.scaled)
+    a <- X1.scaled
+    c <- -1*c(t(a) %*% V %*% (X0.scaled) )
+    A <- t(rep(1, length(c)))
+    b <- 1
+    l <- rep(0, length(c))
+    u <- rep(1, length(c))
+    r <- 0
+    res <- ipop(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    res@dual
+    res2 <- ipopCpp(c = c, H = H, A = A, b = b, l = l, u = u, r = r,
+                    margin = 0.0005, maxiter = 1000, sigf = 5, bound = 10)
+    test_that(paste0("kernlab and ipopCPP are equal for synth examples with random weights for starting values for ", i), {
+        expect_equal(res@primal, as.numeric(ipopCpp(c,H,A,b,l,u,r)$primal),
+                     tolerance = tol)
+        expect_equal(res@dual, as.numeric(ipopCpp(c,H,A,b,l,u,r)$dual),
+                     tolerance = tol)
+    })
+}
+
+
+
+
 
 ##compare speed
 ## microbenchmark(

@@ -107,8 +107,7 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
   //The number of rows in H
   int n = H.n_rows;
   int cols = H.n_cols;
-
-  //Rcout << "Rows: " << n << std::endl;
+  double inv_tol = 1.0e-025;
 
   //Check for a decomposed matrix
   int smw = 0;
@@ -123,8 +122,6 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     n = cols;
     H = H.t();
   }
-
-  //Rcout << "smw: " << smw << std::endl;
 
   //The number of rows in A
   int m = A.n_rows;
@@ -206,7 +203,9 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     //Solve s_tmp = AP^{-1} %*% c(c.x,c.y)
     arma::vec cvec = join_vert(c_x, c_y);  // stack the c_x and c_y vectors
     // Solve
-    arma::vec s_tmp  = arma::solve(AP, cvec);
+    arma::mat AP_pinv = pinv(AP, inv_tol);
+    arma::vec s_tmp = AP_pinv *  cvec;
+    //arma::vec s_tmp  = arma::solve(AP, cvec);
 
     // Get x and y
     x = s_tmp.rows(0, n - 1);
@@ -218,11 +217,17 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     arma::mat smwinner = V + chol(H.t() * H);
     arma::mat smwa1 = A.t();
     arma::mat smwc1 = c_x;
+    // arma::mat smwa2 = smwa1 -
+    //   (H * arma::solve(smwinner, arma::solve(smwinner.t(), (H.t() * smwa1))));
+    arma::mat smwinner_pinv = arma::pinv(smwinner, inv_tol);
     arma::mat smwa2 = smwa1 -
-      (H * arma::solve(smwinner, arma::solve(smwinner.t(), (H.t() * smwa1))));
+      (smwinner_pinv * (smwinner_pinv.t() * (H.t() * smwa1)));
+    // arma::mat smwc2 = smwc1 -
+    //   (H * arma::solve(smwinner, arma::solve(smwinner.t(), (H.t() * smwc1))));
     arma::mat smwc2 = smwc1 -
-      (H * arma::solve(smwinner, arma::solve(smwinner.t(), (H.t() * smwc1))));
-    y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
+      (H * (smwinner_pinv * (smwinner_pinv.t() * (H.t() * smwc1))));
+    // y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
+    y = arma::pinv(A * smwa2 + H_y, inv_tol) * c_y + A * smwc2;
     x = smwa2 * y - smwc2;
   }
 
@@ -287,6 +292,8 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     //double.
     sigfig = as_scalar(-1*log10(abs(primal_obj - dual_obj) / (abs(primal_obj) + 1)));
 
+
+
     if (sigfig <= 0) sigfig = 0;
     if (sigfig >= sigf) break;
 
@@ -308,6 +315,8 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     c_x = sigma - z % hat_nu / g - s % hat_tau / t;
     c_y = rho - e % (hat_beta - q % hat_alpha / p);
 
+
+
     // and solve the system [-H.x A' A H.y] [delta.x, delta.y] <- [c.x c.y]
     //Add in -H_x for the first n x n matrix of AP 0 to n for
     //both rows and columns
@@ -320,7 +329,8 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
       //Solve s_tmp = AP^{-1} %*% c(c.x,c.y)
       arma::vec cvec = join_vert(c_x, c_y);  // stack the c_x and c_y vectors
       // Solve
-      arma::vec s1_tmp  = arma::solve(AP, cvec);
+      //arma::vec s1_tmp  = arma::solve(AP, cvec);
+      arma::vec s1_tmp = arma::pinv(AP, inv_tol) * cvec;
       delta_x = s1_tmp.rows(0, n - 1);
       delta_y = s1_tmp.rows(n, n + m - 1);
     } else {
@@ -329,11 +339,28 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
       arma::mat smwa1 = A.t();
       smwa1  = smwa1 / d;
       arma::mat smwc1 = c_x / d;
-      arma::mat smwa2 = A.t() -
-	(H * arma::solve(smwinner, arma::solve(smwinner.t(), H.t() * smwa1)));
+      //Use pinv to allow for tolerance in matrix inversion
+      arma::mat smwinner_pinv = arma::pinv(smwinner, inv_tol);
+      arma::mat smwa2 = A.t() - (smwinner_pinv * (smwinner_pinv.t() * (H.t() * smwa1)));
+      // arma::mat smwa2 = A.t() -
+      // 	(H * arma::solve(smwinner,
+      // 			 arma::solve(smwinner.t(),
+      // 				     H.t() * smwa1,
+      // 				     )
+      // 			 ));
       smwa2 = smwa2 / d;
-      arma::mat smwc2 = (c_x - (H * arma::solve(smwinner, arma::solve(smwinner.t(), H.t() * smwc1)))) / d;
-      delta_y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
+      arma::mat smwc2 = c_x - (smwinner_pinv * (smwinner_pinv.t() * (H.t() * smwc1)));
+      smwc2 = smwc2 / d;
+
+      // arma::mat smwc2 = (c_x -
+      // 			 (H * arma::solve(smwinner,
+      // 					  arma::solve(smwinner.t(),
+      // 						      H.t() * smwc1
+      // 						      )
+      // 					  )
+      // 			  )) / d;
+      delta_y = arma::pinv(A * smwa2 + H_y, inv_tol) * (c_y + A * smwc2);
+      //delta_y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
       delta_x = smwa2 * delta_y - smwc2;
     }
 
@@ -372,7 +399,6 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     c_x = sigma - z % hat_nu / g - s % hat_tau / t;
     c_y = rho - e % (hat_beta - q % hat_alpha / p);
 
-
     // and solve the system [-H.x A' A H.y] [delta.x, delta.y] <- [c.x c.y]
     if (smw == 0) {
       //Add in -H_x for the first n x n matrix of AP 0 to n for
@@ -381,13 +407,19 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
       //The last m rows and the last m columns set to H_y
       AP(arma::span(n, n + m - 1), arma::span(n, n + m - 1)) = H_y;
       // Solve
-      arma::vec s1_tmp  = arma::solve(AP, join_vert(c_x, c_y));
+      // arma::vec s1_tmp  = arma::solve(AP, join_vert(c_x, c_y));
+      arma::vec s1_tmp  = arma::pinv(AP, inv_tol) * join_vert(c_x, c_y);
       delta_x = s1_tmp.rows(0, n - 1);
       delta_y = s1_tmp.rows(n, n + m - 1);
     } else if (smw == 1) {
       smwc1 = c_x / d;
-      smwc2 = (c_x - (H * arma::solve(smwinner, arma::solve(smwinner.t(), H.t() * smwc1)))) / d;
-      delta_y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
+      arma::mat smwinner_pinv = arma::pinv(smwinner, inv_tol);
+      // smwc2 = (c_x -
+      // 	       (H * arma::solve(smwinner, arma::solve(smwinner.t(), H.t() * smwc1)))) / d;
+      smwc2 = (c_x -
+	       (H * (smwinner_pinv * (smwinner_pinv.t() * (H.t() * smwc1))))) / d;
+      // delta_y = arma::solve(A * smwa2 + H_y, c_y + A * smwc2);
+      delta_y = arma::pinv(A * smwa2 + H_y, inv_tol) * (c_y + A * smwc2);
       delta_x = smwa2 * delta_y - smwc2;
     }
 
@@ -425,6 +457,9 @@ List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b,
     mu = newmu;
 
   }
+
+
+
 
   //primal and dual infeasiblity
   double primal_infeasibility = max(svd(join_vert(join_vert(join_vert(rho, tau), alpha), nu))) / b_plus_1;
