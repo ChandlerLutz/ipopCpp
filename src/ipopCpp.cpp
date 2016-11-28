@@ -26,16 +26,22 @@ arma::mat chunkmultCpp(arma::mat Z, double csize, arma::vec colscale) {
   return res;
 }
 
-//Helper Function to convert to NumericVector, apply pmax, with bound,
-//and return and arma vector
+//' RcppArmadillo implementation of the R pmax()
+//' function
+//'
+//' @title RcppArmadillo implemenation of the r pmax function
+//' @param x the (aramdillo) vector
+//' @param bound the (double) bound
+//'
+// [[Rcpp::export]]
 arma::vec pmax_arma(arma::vec x, double bound) {
-  NumericVector x_rcpp = wrap(x);
-  //Run pmax
-  NumericVector out_rcpp = pmax(x_rcpp, bound);
-  //Convert back to arma vec
-  arma::vec out = as<arma::vec>(out_rcpp);
-  return out;
+  int length_x = x.n_elem;
+  for (int i = 0; i < length_x; i++) {
+    if (x(i) < bound) x(i) = bound;
+  }
+  return x;
 }
+
 
 //' Solve Quadratic Programming problems
 //'

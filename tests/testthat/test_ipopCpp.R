@@ -13,6 +13,12 @@ library(microbenchmark)
 
 ##source("R/ipop_kernlab.R")
 
+test_that("pmax_arma is equal to pmax()", {
+    expect_equal(pmax(1:10, 4), as.numeric(pmax_arma(1:10, 4)))
+    expect_equal(pmax(10:1, 4), as.numeric(pmax_arma(10:1, 4)))
+})
+
+
 set.seed(1234)
 
 ## -- Small tests for comparing Cpp to r output -- ##

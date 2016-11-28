@@ -6,6 +6,18 @@
 
 using namespace Rcpp;
 
+// pmax_arma
+arma::vec pmax_arma(arma::vec x, double bound);
+RcppExport SEXP ipopCpp_pmax_arma(SEXP xSEXP, SEXP boundSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type bound(boundSEXP);
+    rcpp_result_gen = Rcpp::wrap(pmax_arma(x, bound));
+    return rcpp_result_gen;
+END_RCPP
+}
 // ipopCpp
 List ipopCpp(arma::vec c, arma::mat H, arma::mat A, arma::vec b, arma::vec l, arma::vec u, arma::vec r, int sigf, int maxiter, double margin, double bound);
 RcppExport SEXP ipopCpp_ipopCpp(SEXP cSEXP, SEXP HSEXP, SEXP ASEXP, SEXP bSEXP, SEXP lSEXP, SEXP uSEXP, SEXP rSEXP, SEXP sigfSEXP, SEXP maxiterSEXP, SEXP marginSEXP, SEXP boundSEXP) {
